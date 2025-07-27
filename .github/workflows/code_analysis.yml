@@ -1,0 +1,65 @@
+name: Code Complexity & CFG Analysis
+
+on:
+  push:
+    branches:
+      - main
+      - test # Run on pushes to main or test branches
+  pull_request:
+    branches:
+      - main
+      - test # Run on pull requests targeting main or test
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest # Use an Ubuntu runner, as it simplifies Graphviz installation
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4 # Action to get your repository's code
+
+    - name: Set up Python
+      uses: actions/setup-python@v5 # Action to set up a Python environment
+      with:
+        python-version: '3.x' # Use the latest Python 3.x version available
+
+    - name: Install Python dependencies
+      run: |
+        # Upgrade pip to ensure the latest version for installations
+        python -m pip install --upgrade pip
+        # Install radon for complexity, graphviz for Python binding, and astunparse for AST parsing (needed for older Pythons)
+        pip install radon graphviz astunparse
+
+    - name: Install Graphviz (system-wide)
+      # This command installs the Graphviz command-line tools (like 'dot') on the Ubuntu runner
+      run: sudo apt-get update && sudo apt-get install -y graphviz
+
+    - name: Run Code Analysis Script and Generate CFG
+      id: run_analysis # Assign an ID to this step if you need to reference its outputs later
+      run: |
+        # IMPORTANT: Replace 'analyze_code.py' with the actual name of your Python script
+        # (e.g., 'generate_ast_cfg.py' if that's what you named it).
+        # Ensure this script is in the root of your repository.
+        python analyze_code.py
+
+        # Convert the generated .dot file to a .png image using the system-wide Graphviz 'dot' command
+        # This assumes your Python script outputs 'user_behavior_cfg_radon.dot'
+        if [ -f user_behavior_cfg_radon.dot ]; then
+          dot -Tpng user_behavior_cfg_radon.dot -o user_behavior_cfg_radon.png
+          echo "Generated user_behavior_cfg_radon.png successfully."
+        else
+          echo "Error: user_behavior_cfg_radon.dot was not found. CFG image could not be generated."
+          exit 1 # Fail the step if the .dot file is missing
+        fi
+
+    - name: Upload CFG Artifacts
+      uses: actions/upload-artifact@v4 # Action to upload generated files as workflow artifacts
+      with:
+        name: code-analysis-results # Name of the artifact bundle
+        path: |
+          user_behavior_cfg_radon.dot  # Upload the .dot file
+          user_behavior_cfg_radon.png  # Upload the generated PNG image
+        retention-days: 5 # How long to keep the artifacts (e.g., 5 days)
+
+    - name: Display Completion Message
+      run: echo "Code complexity and CFG analysis complete. Check workflow logs for complexity value and download 'code-analysis-results' artifact for CFG."
