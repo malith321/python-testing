@@ -40,7 +40,7 @@ jobs:
         # IMPORTANT: Replace 'analyze_code.py' with the actual name of your Python script
         # (e.g., 'generate_ast_cfg.py' if that's what you named it).
         # Ensure this script is in the root of your repository.
-        python analyze_code.py
+        python generate_ast_cfg.py
 
         # Convert the generated .dot file to a .png image using the system-wide Graphviz 'dot' command
         # This assumes your Python script outputs 'user_behavior_cfg_radon.dot'
