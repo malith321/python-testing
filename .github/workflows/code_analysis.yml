@@ -25,29 +25,28 @@ jobs:
 
     - name: Install Python dependencies
       run: |
-        # Upgrade pip to ensure the latest version for installations
         python -m pip install --upgrade pip
-        # Install radon for complexity, graphviz for Python binding, and astunparse for AST parsing (needed for older Pythons)
         pip install radon graphviz astunparse
 
     - name: Install Graphviz (system-wide)
-      # This command installs the Graphviz command-line tools (like 'dot') on the Ubuntu runner
       run: sudo apt-get update && sudo apt-get install -y graphviz
 
     - name: Run Code Analysis Script and Generate CFG
       id: run_analysis
       run: |
-        # IMPORTANT: Using the correct script name 'generate_ast_cfg.py'
-        # Ensure this script is in the root of your repository.
+        echo "Running Python script..."
         python generate_ast_cfg.py
 
-        # Convert the generated .dot file to a .png image using the system-wide Graphviz 'dot' command
+        echo "Listing files in current directory after script execution:"
+        ls -l
+
         # Using the correct output filename 'user_behavior_cfg_ast.dot'
         if [ -f user_behavior_cfg_ast.dot ]; then
+          echo "Found user_behavior_cfg_ast.dot. Converting to PNG..."
           dot -Tpng user_behavior_cfg_ast.dot -o user_behavior_cfg_ast.png
           echo "Generated user_behavior_cfg_ast.png successfully."
         else
-          echo "Error: user_behavior_cfg_ast.dot was not found. CFG image could not be generated."
+          echo "Error: user_behavior_cfg_ast.dot was NOT found. CFG image could not be generated."
           exit 1 # Fail the step if the .dot file is missing
         fi
 
@@ -56,9 +55,9 @@ jobs:
       with:
         name: code-analysis-results # Name of the artifact bundle
         path: |
-          user_behavior_cfg_ast.dot  # Upload the .dot file with correct name
-          user_behavior_cfg_ast.png  # Upload the generated PNG image with correct name
-        retention-days: 5 # How long to keep the artifacts (e.g., 5 days)
+          user_behavior_cfg_ast.dot
+          user_behavior_cfg_ast.png
+        retention-days: 5
 
     - name: Display Completion Message
       run: echo "Code complexity and CFG analysis complete. Check workflow logs for complexity value and download 'code-analysis-results' artifact for CFG."
