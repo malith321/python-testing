@@ -157,25 +157,161 @@ class CFGVisitor(ast.NodeVisitor):
             self.add_edge(return_node_id, self.function_exit_node_id, label='Return')
         self.current_node = None
 
+    # --- CORRECTED AND IMPROVED visit_If METHOD ---
     def visit_If(self, node):
-        test_node_id = node._id
-        current_after_if_test = self.current_node
+        test_node_id = node._id # This is the 'if condition' node
 
+        # Create a join node for the if/else branches to converge to
+        join_node_id = self.new_node("END IF", shape='point', style='invis') # Invisible point for convergence
+
+        # Handle the 'True' branch (if body)
         if node.body:
-            self.current_node = test_node_id
-            self.visit(node.body[0])
+            self.current_node = test_node_id # Start from the test node
+            self.visit(node.body[0]) # Visit the first statement of the 'if' body
             if_body_entry_node_id = node.body[0]._id
-            if_body_exit_node_id = self.current_node
+            if_body_exit_node_id = self.current_node # This is the last node visited in the 'if' body
             self.add_edge(test_node_id, if_body_entry_node_id, label='True')
+            self.add_edge(if_body_exit_node_id, join_node_id) # Connect 'if' body exit to join node
         else:
-            if_body_exit_node_id = test_node_id
+            # If no 'if' body, the 'True' branch goes directly to join node
+            self.add_edge(test_node_id, join_node_id, label='True (Empty Body)')
 
+        # Handle the 'False' branch (orelse body)
         if node.orelse:
-            self.current_node = test_node_id
-            self.visit(node.orelse[0])
+            self.current_node = test_node_id # Reset current_node to the test for visiting the else part
+            self.visit(node.orelse[0]) # Visit the first statement of the 'else' body
             orelse_body_entry_node_id = node.orelse[0]._id
-            orelse_body_exit_node_id = self.current_node
+            orelse_body_exit_node_id = self.current_node # This is the last node visited in the 'else' body
             self.add_edge(test_node_id, orelse_body_entry_node_id, label='False')
+            self.add_edge(orelse_body_exit_node_id, join_node_id) # Connect 'else' body exit to join node
         else:
-            orelse_body_exit_node_id = test_node_id
-            self.add_edge(test
+            # If no 'else' body, the 'False' branch goes directly to join node
+            self.add_edge(test_node_id, join_node_id, label='False (No else)')
+
+        # After the if/else structure, the next statement will connect from this join node
+        self.current_node = join_node_id
+    # --- END OF CORRECTED AND IMPROVED visit_If METHOD ---
+
+
+    def visit_For(self, node):
+        loop_header_node_id = node._id
+        current_before_loop = self.current_node
+
+        if current_before_loop:
+            self.add_edge(current_before_loop, loop_header_node_id)
+
+        # Loop body
+        if node.body:
+            self.current_node = loop_header_node_id
+            self.visit(node.body[0])
+            loop_body_entry_node_id = node.body[0]._id
+            loop_body_exit_node_id = self.current_node
+            self.add_edge(loop_header_node_id, loop_body_entry_node_id, label='Enter Loop')
+            self.add_edge(loop_body_exit_node_id, loop_header_node_id, label='Loop back')
+        else:
+            loop_body_exit_node_id = loop_header_node_id
+
+        # Loop else (executed if loop completes without a break)
+        if node.orelse:
+            self.current_node = loop_header_node_id
+            self.visit(node.orelse[0])
+            loop_else_entry_node_id = node.orelse[0]._id
+            loop_else_exit_node_id = self.current_node
+            self.add_edge(loop_header_node_id, loop_else_entry_node_id, label='Else (No Break)')
+        else:
+            loop_else_exit_node_id = loop_header_node_id
+
+        # The exit point of the for loop is generally after the loop header and its else block (if any)
+        # For simplicity, we'll connect the node BEFORE the loop header to the point AFTER the loop.
+        # However, for full correctness with `break`/`continue` and complex flow, this needs more specific handling.
+        # For now, we'll just ensure the subsequent statements are correctly attached.
+        self.current_node = loop_header_node_id # This needs careful handling, for now setting to header
+
+
+    def visit_While(self, node):
+        loop_header_node_id = node._id
+        current_before_loop = self.current_node
+
+        if current_before_loop:
+            self.add_edge(current_before_loop, loop_header_node_id)
+
+        # Loop body
+        if node.body:
+            self.current_node = loop_header_node_id
+            self.visit(node.body[0])
+            loop_body_entry_node_id = node.body[0]._id
+            loop_body_exit_node_id = self.current_node
+            self.add_edge(loop_header_node_id, loop_body_entry_node_id, label='True')
+            self.add_edge(loop_body_exit_node_id, loop_header_node_id, label='Loop back')
+        else:
+            loop_body_exit_node_id = loop_header_node_id
+
+        # Loop else (executed if loop completes without a break)
+        if node.orelse:
+            self.current_node = loop_header_node_id
+            self.visit(node.orelse[0])
+            loop_else_entry_node_id = node.orelse[0]._id
+            loop_else_exit_node_id = self.current_node
+            self.add_edge(loop_header_node_id, loop_else_entry_node_id, label='False (Else)')
+        else:
+            loop_else_exit_node_id = loop_header_node_id
+            self.add_edge(loop_header_node_id, loop_else_exit_node_id, label='False')
+
+        # The exit point of the while loop is generally after the loop header and its else block (if any)
+        # For simplicity, we'll connect the node BEFORE the loop header to the point AFTER the loop.
+        # However, for full correctness with `break`/`continue` and complex flow, this needs more specific handling.
+        # For now, we'll just ensure the subsequent statements are correctly attached.
+        self.current_node = loop_header_node_id # This needs careful handling, for now setting to header
+
+
+# Main execution
+if __name__ == "__main__":
+    try:
+        tree = ast.parse(code_to_analyze)
+        code_lines = code_to_analyze.splitlines()
+
+        # --- Calculate Cyclomatic Complexity using Radon ---
+        complexity_results = cc_visit(code_to_analyze)
+        print("\n--- Cyclomatic Complexity (Radon) ---")
+        found_complexity = False
+        for func in complexity_results:
+            if func.name == "analyze_user_behavior":
+                print(f"Function: {func.name}, Complexity: {func.complexity}")
+                found_complexity = True
+                break
+        if not found_complexity:
+            print("Could not find complexity for 'analyze_user_behavior' function.")
+
+
+        # --- Visualize Control Flow Graph ---
+        dot = graphviz.Digraph(comment='Control Flow Graph', graph_attr={'rankdir': 'LR'})
+        visitor = CFGVisitor(dot, code_lines)
+
+        function_found_cfg = False
+        for node in ast.iter_child_nodes(tree):
+            if isinstance(node, ast.FunctionDef) and node.name == "analyze_user_behavior":
+                visitor.visit_FunctionDef(node)
+                function_found_cfg = True
+                break
+        
+        if not function_found_cfg:
+            print("Error: 'analyze_user_behavior' function not found for CFG generation.")
+
+        # Explicitly define the output path base name
+        output_filename_base = "user_behavior_cfg_ast" 
+
+        # Generate .dot file (Graphviz adds the .dot extension)
+        dot_filepath = os.path.join(os.getcwd(), output_filename_base) # No .dot here
+        dot.render(dot_filepath, view=False, format='dot', cleanup=True)
+        print(f"CFG .dot file generated: {dot_filepath}.dot") # Add .dot for print confirmation
+
+        # Generate .png image (Graphviz adds the .png extension)
+        png_filepath = os.path.join(os.getcwd(), output_filename_base) # No .png here
+        dot.render(png_filepath, view=False, format='png', cleanup=True)
+        print(f"CFG .png image generated: {png_filepath}.png")
+
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        print("Please ensure your Python code is syntactically correct and Graphviz (system-wide) is installed and in your PATH.")
+        print("Also, ensure 'radon' is installed (`pip install radon`) and 'astunparse' if you are on Python < 3.9.")
