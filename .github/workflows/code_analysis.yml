@@ -35,20 +35,19 @@ jobs:
       run: sudo apt-get update && sudo apt-get install -y graphviz
 
     - name: Run Code Analysis Script and Generate CFG
-      id: run_analysis # Assign an ID to this step if you need to reference its outputs later
+      id: run_analysis
       run: |
-        # IMPORTANT: Replace 'analyze_code.py' with the actual name of your Python script
-        # (e.g., 'generate_ast_cfg.py' if that's what you named it).
+        # IMPORTANT: Using the correct script name 'generate_ast_cfg.py'
         # Ensure this script is in the root of your repository.
         python generate_ast_cfg.py
 
         # Convert the generated .dot file to a .png image using the system-wide Graphviz 'dot' command
-        # This assumes your Python script outputs 'user_behavior_cfg_radon.dot'
-        if [ -f user_behavior_cfg_radon.dot ]; then
-          dot -Tpng user_behavior_cfg_radon.dot -o user_behavior_cfg_radon.png
-          echo "Generated user_behavior_cfg_radon.png successfully."
+        # Using the correct output filename 'user_behavior_cfg_ast.dot'
+        if [ -f user_behavior_cfg_ast.dot ]; then
+          dot -Tpng user_behavior_cfg_ast.dot -o user_behavior_cfg_ast.png
+          echo "Generated user_behavior_cfg_ast.png successfully."
         else
-          echo "Error: user_behavior_cfg_radon.dot was not found. CFG image could not be generated."
+          echo "Error: user_behavior_cfg_ast.dot was not found. CFG image could not be generated."
           exit 1 # Fail the step if the .dot file is missing
         fi
 
@@ -57,8 +56,8 @@ jobs:
       with:
         name: code-analysis-results # Name of the artifact bundle
         path: |
-          user_behavior_cfg_radon.dot  # Upload the .dot file
-          user_behavior_cfg_radon.png  # Upload the generated PNG image
+          user_behavior_cfg_ast.dot  # Upload the .dot file with correct name
+          user_behavior_cfg_ast.png  # Upload the generated PNG image with correct name
         retention-days: 5 # How long to keep the artifacts (e.g., 5 days)
 
     - name: Display Completion Message
